@@ -1,60 +1,82 @@
 package ru.mirea.project.model;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
-public class Registration{
+public class Registration {
+    private static final DateTimeFormatter DATE_FORMAT =
+        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     private final long id;
-    private final Player player;
+    private final User user;
     private final Tournament tournament;
     private RegistrationStatus status;
-    private final LocalDateTime createdAt;
-
-    public Registration(long id, Player player, Tournament tournament){
-        if (id<=0){
+    private final LocalDateTime registeredAt;
+    public Registration(
+        long id,
+        User user,
+        Tournament tournament,
+        RegistrationStatus status,
+        LocalDateTime registeredAt
+    ) {
+        if (id <= 0) {
             throw new IllegalArgumentException("ID должен быть положительным");
         }
-        if (player==null){
-            throw new IllegalArgumentException("Игрок обязателен");
+        if (user == null) {
+            throw new IllegalArgumentException("Пользователь обязателен");
         }
-        if (tournament==null){
+        if (user.getRole() != UserRole.PLAYER) {
+            throw new IllegalArgumentException("Подавать заявку может только игрок");
+        }
+        if (tournament == null) {
             throw new IllegalArgumentException("Турнир обязателен");
+        }
+        if (status == null) {
+            throw new IllegalArgumentException("Статус заявки обязателен");
+        }
+        if (registeredAt == null) {
+            throw new IllegalArgumentException("Дата подачи заявки обязательна");
         }
 
         this.id = id;
-        this.player = player;
+        this.user = user;
         this.tournament = tournament;
-        this.status = RegistrationStatus.PENDING;
-        this.createdAt = LocalDateTime.now();
+        this.status = status;
+        this.registeredAt = registeredAt;
     }
 
-    public long getId(){
+    public long getId() {
         return id;
     }
-    public Player getPlayer(){
-        return player;
+    public User getUser() {
+        return user;
     }
-    public Tournament getTournament(){
+    public Tournament getTournament() {
         return tournament;
     }
-    public RegistrationStatus getStatus(){
+    public RegistrationStatus getStatus() {
         return status;
     }
-    public LocalDateTime getCreatedAt(){
-        return createdAt;
+    public LocalDateTime getRegisteredAt() {
+        return registeredAt;
     }
-    public void changeStatus(RegistrationStatus newStatus){
-        if (newStatus == null){
-            throw new IllegalArgumentException("Статус обязателен");
+    public void changeStatus(RegistrationStatus newStatus) {
+        if (newStatus == null) {
+            throw new IllegalArgumentException("Новый статус обязателен");
         }
-        this.status = newStatus;
+        if (status == RegistrationStatus.CANCELLED
+            || status == RegistrationStatus.REJECTED) {
+            throw new IllegalStateException("Нельзя изменить завершённую заявку");
+        }
+        status = newStatus;
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return "Заявка #" + id
-        +": " + player.getFullName()
-        +" -> " + tournament.getTitle()
-        +", статус: "+status;
+            + ": " + user.getFullName()
+            + " -> " + tournament.getTitle()
+            + ", статус: " + status
+            + ", подана: " + registeredAt.format(DATE_FORMAT);
     }
 }

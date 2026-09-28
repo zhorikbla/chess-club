@@ -1,6 +1,6 @@
 package ru.mirea.project.model;
 
-public enum RegistrationStatus{
+public enum RegistrationStatus {
     PENDING,
     CONFIRMED,
     REJECTED,
