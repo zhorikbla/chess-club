@@ -7,3 +7,4 @@ exports/
 *.log
 .env
 .reference/
+full-tz/

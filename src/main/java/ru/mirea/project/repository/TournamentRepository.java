@@ -13,7 +13,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TournamentRepository {
+public class TournamentRepository implements CrudRepository<Tournament> {
     private final DatabaseManager databaseManager;
 
     public TournamentRepository(
@@ -21,6 +21,7 @@ public class TournamentRepository {
     ) {
         this.databaseManager = databaseManager;
     }
+    @Override
     public List<Tournament> findAll() throws SQLException {
         String sql = """
         SELECT id,
@@ -139,7 +140,7 @@ public class TournamentRepository {
             return changedRows == 1;
         }
     }
-
+    @Override
     public boolean deleteById(long id) throws SQLException {
         String sql = """
         DELETE FROM tournaments
@@ -172,7 +173,7 @@ public class TournamentRepository {
             )
         );
     }
-
+    @Override
     public Tournament findById(long id) throws SQLException {
         String sql = """
         SELECT id,

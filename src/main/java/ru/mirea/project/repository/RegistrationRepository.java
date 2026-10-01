@@ -17,8 +17,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Comparator;
 
-public class RegistrationRepository {
+public class RegistrationRepository implements CrudRepository<Registration> {
     private final DatabaseManager databaseManager;
 
     public RegistrationRepository(
@@ -26,6 +28,7 @@ public class RegistrationRepository {
     ) {
         this.databaseManager = databaseManager;
     }
+    @Override
     public List<Registration> findAll() throws SQLException {
         String sql = """
             SELECT
@@ -110,6 +113,7 @@ public class RegistrationRepository {
             )
             .toList();
     }
+    @Override
     public Registration findById(
         long id
     ) throws SQLException {
@@ -168,6 +172,97 @@ public class RegistrationRepository {
             return changedRows == 1;
         }
     }
+
+    public boolean hasActiveRegistration(
+        long userId,
+        long tournamentId
+    ) throws SQLException {
+        String sql = """
+            SELECT 1
+            FROM registrations
+            WHERE user_id = ?
+              AND tournament_id = ?
+              AND status IN ('PENDING', 'CONFIRMED')
+            """;
+
+        try (Connection connection = databaseManager.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, userId);
+            statement.setLong(2, tournamentId);
+
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next();
+            }
+        }
+    }
+
+    public long countActiveByTournamentId(long tournamentId)
+        throws SQLException {
+        String sql = """
+            SELECT count(*)
+            FROM registrations
+            WHERE tournament_id = ?
+              AND status IN ('PENDING', 'CONFIRMED')
+            """;
+
+        try (Connection connection = databaseManager.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, tournamentId);
+
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        }
+    }
+    public List<Registration> searchByPlayerName(
+        String playerName
+    ) throws SQLException {
+        String normalizedName = playerName.trim().toLowerCase(Locale.ROOT);
+        return findAll().stream().filter(registration->registration.getUser().getFullName().toLowerCase(Locale.ROOT).contains(normalizedName)).toList();
+    }
+    public List<Registration> searchByTournamentTitle(
+        String tournamentTitle
+    ) throws SQLException {
+        String normalizedTitle = tournamentTitle.trim().toLowerCase(Locale.ROOT);
+        return findAll().stream().filter(registration -> registration.getTournament().getTitle().toLowerCase(Locale.ROOT).contains(normalizedTitle)).toList();
+    }
+    public List<Registration> filterByStatus(
+        RegistrationStatus status
+    ) throws SQLException{
+        return findAll()
+        .stream()
+        .filter(registration -> registration.getStatus()==status).toList();
+    }
+
+    public List<Registration> filterByDateRange(
+        LocalDate from,
+        LocalDate to
+    ) throws SQLException{
+        if (from == null || to==null || to.isBefore(from)){
+            throw new IllegalArgumentException(
+                "Некорректный диапозон дат"
+            );
+        }
+        return findAll().stream().filter(registraion-> {LocalDate registrationDate = registraion.getRegisteredAt().toLocalDate();
+            return !registrationDate.isBefore(from)
+                && !registrationDate.isAfter(to);
+        }).toList();
+    }
+    public List<Registration> sortByRegisteredAt()
+        throws SQLException {
+            return findAll().stream().sorted(
+                Comparator.comparing(
+                    Registration::getRegisteredAt
+                )
+            ).toList();
+        }
+    public List<Registration> sortByPlayerRatingDescending()
+        throws SQLException{
+            return findAll().stream().sorted(Comparator.comparingInt(
+                (Registration registration) -> registration.getUser().getRating()
+            ).reversed()).toList();
+        }
     private Registration mapRegistration(
         ResultSet result
     ) throws SQLException {
@@ -220,4 +315,29 @@ public class RegistrationRepository {
             )
         );
     }
+    @Override
+    public boolean deleteById(long id)
+        throws SQLException {
+
+        String sql = """
+            UPDATE registrations
+            SET status = 'CANCELLED'
+            WHERE id = ?
+              AND status IN ('PENDING', 'CONFIRMED')
+            """;
+
+        try (Connection connection =
+                 databaseManager.getConnection();
+
+            PreparedStatement statement =
+                 connection.prepareStatement(sql)) {
+
+            statement.setLong(1, id);
+
+            int changedRows = statement.executeUpdate();
+
+            return changedRows == 1;
+        }
+    }
+
 }

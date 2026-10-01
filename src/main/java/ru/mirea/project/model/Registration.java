@@ -75,6 +75,7 @@ public class Registration {
     public String toString() {
         return "Заявка #" + id
             + ": " + user.getFullName()
+            +" (рейтинг: " + user.getRating()+")"
             + " -> " + tournament.getTitle()
             + ", статус: " + status
             + ", подана: " + registeredAt.format(DATE_FORMAT);

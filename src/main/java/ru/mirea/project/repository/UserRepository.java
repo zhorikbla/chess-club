@@ -11,7 +11,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class UserRepository {
+public class UserRepository implements CrudRepository<User> {
     private final DatabaseManager databaseManager;
 
     public UserRepository(DatabaseManager databaseManager) {
@@ -35,6 +35,7 @@ public class UserRepository {
             }
         }
     }
+    @Override
     public List<User> findAll() throws SQLException {
         String sql = """
         SELECT id, full_name, email, role, rating
@@ -108,7 +109,7 @@ public class UserRepository {
             return changedRows == 1;
         }
     }
-
+    @Override
     public boolean deleteById(long id) throws SQLException {
         String sql = """
             DELETE FROM users
@@ -120,6 +121,24 @@ public class UserRepository {
 
             int deletedRows = statement.executeUpdate();
             return deletedRows == 1;
+        }
+    }
+    @Override
+    public User findById(long id) throws SQLException{
+        String sql = """
+            SELECT id, full_name, email, role, rating
+            FROM users
+            WHERE id = ?
+            """;
+        try (Connection connection = databaseManager.getConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)){
+            statement.setLong(1, id);
+            try (ResultSet result = statement.executeQuery()){
+                if (!result.next()){
+                    return null;
+                }
+                return mapUser(result);
+            }
         }
     }
 

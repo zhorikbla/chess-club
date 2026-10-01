@@ -11,12 +11,22 @@ import ru.mirea.project.model.UserRole;
 import ru.mirea.project.repository.RegistrationRepository;
 import ru.mirea.project.repository.TournamentRepository;
 import ru.mirea.project.repository.UserRepository;
+import ru.mirea.project.util.ExcelExporter;
+import ru.mirea.project.model.RegistrationStatistics;
+import ru.mirea.project.exception.BusinessException;
+import ru.mirea.project.service.RegistrationService;
+import ru.mirea.project.service.TournamentService;
+import ru.mirea.project.service.UserService;
+import ru.mirea.project.service.StatisticsService;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Scanner;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Comparator;
 
 public class Main {
     public static void main(String[] args) {
@@ -32,16 +42,32 @@ public class Main {
         );
         UserRepository userRepository =
                 new UserRepository(databaseManager);
+        UserService userService =
+                new UserService(userRepository);
         TournamentRepository tournamentRepository =
                 new TournamentRepository(databaseManager);
+        TournamentService tournamentService =
+                new TournamentService(tournamentRepository);
         RegistrationRepository registrationRepository =
                 new RegistrationRepository(databaseManager);
+        RegistrationService registrationService =
+                new RegistrationService(
+                    registrationRepository,
+                    userRepository,
+                    tournamentRepository
+                );
+        StatisticsService statisticsService =
+                new StatisticsService(
+                    userRepository,
+                    tournamentRepository,
+                    registrationRepository
+                );
+        ExcelExporter excelExporter = new ExcelExporter();
         try (Scanner scanner = new Scanner(System.in)) {
             System.out.print("Введите email: ");
             String email = scanner.nextLine().trim();
 
-            User currentUser = userRepository.findByEmail(email);
-
+        User currentUser = userService.findByEmail(email);
             if (currentUser == null) {
                 System.out.println("Пользователь не найден");
                 return;
@@ -53,19 +79,25 @@ public class Main {
             if (currentUser.getRole() == UserRole.ADMIN) {
                 runAdminMenu(
                     scanner,
-                    userRepository,
-                    tournamentRepository,
-                    registrationRepository,
+                    userService,
+                    tournamentService,
+                    registrationService,
+                    excelExporter,
+                    statisticsService,
                     currentUser
                 );
             } else {
                 runPlayerMenu(
                     scanner,
-                    tournamentRepository,
-                    registrationRepository,
+                    tournamentService,
+                    registrationService,
                     currentUser
                 );
             }
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (SQLException exception) {
             System.out.println(
                 "Ошибка работы с БД: "
@@ -76,86 +108,237 @@ public class Main {
 
     private static void runAdminMenu(
         Scanner scanner,
-        UserRepository userRepository,
-        TournamentRepository tournamentRepository,
-        RegistrationRepository registrationRepository,
+        UserService userService,
+        TournamentService tournamentService,
+        RegistrationService registrationService,
+        ExcelExporter excelExporter,
+        StatisticsService statisticsService,
         User currentUser
     ) throws SQLException {
         boolean isRunning = true;
 
         while (isRunning) {
             System.out.println();
-            System.out.println("=== МЕНЮ АДМИНИСТРАТОРА ===");
-            System.out.println("1. Показать всех пользователей");
-            System.out.println("2. Показать турниры");
-            System.out.println("3. Показать заявки");
-            System.out.println("4. Создать пользователя");
-            System.out.println("5. Изменить пользователя");
-            System.out.println("6. Удалить пользователя");
-            System.out.println("7. Создать турнир");
-            System.out.println("8. Изменить турнир");
-            System.out.println("9. Удалить турнир");
-            System.out.println("10. Изменить статус заявки");
-            System.out.println("0. Выход");
-            System.out.print("Выберите действие: ");
+        System.out.println("=== МЕНЮ АДМИНИСТРАТОРА ===");
+        System.out.println("1. Управление пользователями");
+        System.out.println("2. Управление турнирами");
+        System.out.println("3. Управление заявками");
+        System.out.println("4. Экспорт данных в Excel");
+        System.out.println("5. Показать статистику");
+        System.out.println("0. Выход");
+        System.out.print("Выберите действие: ");
 
             String choice = scanner.nextLine().trim();
             switch (choice) {
-                case "1" -> {
-                    List<User> users = userRepository.findAll();
-                    System.out.println();
-                    System.out.println("=== ПОЛЬЗОВАТЕЛИ ===");
-                    for (User user : users) {
-                        System.out.println(user);
-                    }
-                }
-                case "2" -> {
-                    List<Tournament> tournaments =
-                        tournamentRepository.findAll();
-
-                    System.out.println();
-                    System.out.println("=== ТУРНИРЫ ===");
-
-                    for (Tournament tournament : tournaments) {
-                        System.out.println(tournament);
-                    }
-                }
-                case "3" -> {
-                    List<Registration> registrations =
-                        registrationRepository.findAll();
-
-                    System.out.println();
-                    System.out.println("=== ЗАЯВКИ ===");
-
-                    for (Registration registration : registrations) {
-                        System.out.println(registration);
-                    }
-                }
-                case "4" ->
-                    createUser(scanner, userRepository);
-                case "5" ->
-                    updateUser(scanner, userRepository);
-                case "6" ->
-                    deleteUser(scanner, userRepository, currentUser);
-                case "7" ->
-                    createTournament(scanner, tournamentRepository);
-                case "8" ->
-                    updateTournament(scanner, tournamentRepository);
-                case "9" ->
-                    deleteTournament(scanner, tournamentRepository);
-                case "10" ->
-                    changeRegistrationStatus(scanner, registrationRepository);
-                case "0" -> {
-                    isRunning = false;
-                    System.out.println("Выход из программы");
-                }
-                default -> System.out.println("Неизвестный ввод");
+                case "1" -> runUsersMenu(
+                scanner,
+                userService,
+                currentUser
+            );
+            case "2" -> runTournamentsMenu(
+                scanner,
+                tournamentService
+            );
+            case "3" -> runRegistrationsMenu(
+                scanner,
+                registrationService
+            );
+            case "4" ->
+                exportToExcel(
+                    userService,
+                    tournamentService,
+                    registrationService,
+                    excelExporter
+                );
+            case "5" ->
+                showStatistics(statisticsService);
+            case "0" -> {
+                isRunning = false;
+                System.out.println("Выход из программы");
+            }
+            default ->
+                System.out.println("Неизвестный пункт меню");
             }
         }
     }
+    private static void runUsersMenu(
+    Scanner scanner,
+    UserService userService,
+    User currentUser
+) throws SQLException {
+    boolean isRunning = true;
+
+    while (isRunning) {
+        System.out.println();
+        System.out.println("=== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ===");
+        System.out.println("1. Показать всех пользователей");
+        System.out.println("2. Создать пользователя");
+        System.out.println("3. Изменить пользователя");
+        System.out.println("4. Удалить пользователя");
+        System.out.println("0. Назад");
+        System.out.print("Выберите действие: ");
+
+        String choice = scanner.nextLine().trim();
+
+        switch (choice) {
+            case "1" -> {
+                List<User> users = userService.findAll();
+                System.out.println();
+                System.out.println("=== ПОЛЬЗОВАТЕЛИ ===");
+
+                for (User user : users) {
+                    System.out.println(user);
+                }
+            }
+            case "2" ->
+                createUser(scanner, userService);
+            case "3" ->
+                updateUser(scanner, userService);
+            case "4" ->
+                deleteUser(
+                    scanner,
+                    userService,
+                    currentUser
+                );
+            case "0" ->
+                isRunning = false;
+            default ->
+                System.out.println("Неизвестный пункт меню");
+        }
+    }
+}
+private static void runTournamentsMenu(
+    Scanner scanner,
+    TournamentService tournamentService
+) throws SQLException {
+    boolean isRunning = true;
+
+    while (isRunning) {
+        System.out.println();
+        System.out.println("=== УПРАВЛЕНИЕ ТУРНИРАМИ ===");
+        System.out.println("1. Показать турниры");
+        System.out.println("2. Создать турнир");
+        System.out.println("3. Изменить турнир");
+        System.out.println("4. Удалить турнир");
+        System.out.println("0. Назад");
+        System.out.print("Выберите действие: ");
+
+        String choice = scanner.nextLine().trim();
+
+        switch (choice) {
+            case "1" -> {
+                List<Tournament> tournaments =
+                    tournamentService.findAll();
+
+                System.out.println();
+                System.out.println("=== ТУРНИРЫ ===");
+
+                for (Tournament tournament : tournaments) {
+                    System.out.println(tournament);
+                }
+            }
+            case "2" ->
+                createTournament(
+                    scanner,
+                    tournamentService
+                );
+            case "3" ->
+                updateTournament(
+                    scanner,
+                    tournamentService
+                );
+            case "4" ->
+                deleteTournament(
+                    scanner,
+                    tournamentService
+                );
+            case "0" ->
+                isRunning = false;
+            default ->
+                System.out.println("Неизвестный пункт меню");
+        }
+    }
+}
+private static void runRegistrationsMenu(
+    Scanner scanner,
+    RegistrationService registrationService
+) throws SQLException {
+    boolean isRunning = true;
+
+    while (isRunning) {
+        System.out.println();
+        System.out.println("=== УПРАВЛЕНИЕ ЗАЯВКАМИ ===");
+        System.out.println("1. Показать все заявки");
+        System.out.println("2. Найти заявку по ID");
+        System.out.println("3. Изменить статус заявки");
+        System.out.println("4. Поиск по игроку");
+        System.out.println("5. Поиск по турниру");
+        System.out.println("6. Фильтр по статусу");
+        System.out.println("7. Фильтр по диапазону дат");
+        System.out.println("8. Сортировка по дате");
+        System.out.println("9. Сортировка по рейтингу");
+        System.out.println("0. Назад");
+        System.out.print("Выберите действие: ");
+
+        String choice = scanner.nextLine().trim();
+
+        switch (choice) {
+            case "1" ->
+                printRegistrations(
+                    "ВСЕ ЗАЯВКИ",
+                    registrationService.findAll()
+                );
+            case "2" ->
+                findRegistrationById(
+                    scanner,
+                    registrationService
+                );
+            case "3" ->
+                changeRegistrationStatus(
+                    scanner,
+                    registrationService
+                );
+            case "4" ->
+                searchRegistrationsByPlayer(
+                    scanner,
+                    registrationService
+                );
+            case "5" ->
+                searchRegistrationsByTournament(
+                    scanner,
+                    registrationService
+                );
+            case "6" ->
+                filterRegistrationsByStatus(
+                    scanner,
+                    registrationService
+                );
+            case "7" ->
+                filterRegistrationsByDate(
+                    scanner,
+                    registrationService
+                );
+            case "8" ->
+                printRegistrations(
+                    "ЗАЯВКИ ПО ДАТЕ",
+                    registrationService.sortByRegisteredAt()
+                );
+            case "9" ->
+                printRegistrations(
+                    "ЗАЯВКИ ПО РЕЙТИНГУ ИГРОКА",
+                    registrationService
+                        .sortByPlayerRatingDescending()
+                );
+            case "0" ->
+                isRunning = false;
+            default ->
+                System.out.println("Неизвестный пункт меню");
+        }
+    }
+}
     private static void createUser(
         Scanner scanner,
-        UserRepository userRepository
+        UserService userService
     ) {
         try {
             System.out.print("ФИО: ");
@@ -173,7 +356,7 @@ public class Main {
             int rating = Integer.parseInt(
                 scanner.nextLine().trim()
             );
-            User createdUser = userRepository.create(
+            User createdUser = userService.create(
                 fullName,
                 email,
                 role,
@@ -182,6 +365,10 @@ public class Main {
 
             System.out.println("Пользователь создан: ");
             System.out.println(createdUser);
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (NumberFormatException exception) {
             System.out.println(
                 "Ошибка: рейтинг должен быть целым числом"
@@ -200,7 +387,7 @@ public class Main {
 
     private static void updateUser(
         Scanner scanner,
-        UserRepository userRepository
+        UserService userService
     ) {
         try {
             System.out.print("ID пользователя: ");
@@ -223,7 +410,7 @@ public class Main {
             int rating = Integer.parseInt(
                 scanner.nextLine().trim()
             );
-            boolean updated = userRepository.update(
+            userService.update(
                 id,
                 fullName,
                 email,
@@ -231,11 +418,11 @@ public class Main {
                 rating
             );
 
-            if (updated) {
-                System.out.println("Пользователь изменён");
-            } else {
-                System.out.println("Пользователь с ID " + id + " не найден");
-            }
+            System.out.println("Пользователь изменён");
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (NumberFormatException exception) {
             System.out.println(
                 "Ошибка: рейтинг и ID должны быть целыми числами"
@@ -254,7 +441,7 @@ public class Main {
 
     private static void deleteUser(
         Scanner scanner,
-        UserRepository userRepository,
+        UserService userService,
         User currentUser
     ) {
         try {
@@ -264,12 +451,6 @@ public class Main {
                 scanner.nextLine().trim()
             );
 
-            if (id == currentUser.getId()) {
-                System.out.println(
-                    "Нельзя удалить пользователя, под которым выполнен активный вход"
-                );
-                return;
-            }
             System.out.print("Для подтверждения напишите Y/Да: ");
             String confirmation = scanner.nextLine().trim();
             if (!confirmation.equalsIgnoreCase("да")
@@ -278,15 +459,18 @@ public class Main {
                 return;
             }
 
-            boolean deleted = userRepository.deleteById(id);
+            userService.delete(
+                id,
+                currentUser.getId()
+            );
 
-            if (deleted) {
-                System.out.println("Пользователь удалён");
-            } else {
-                System.out.println("Пользователь с ID " + id + " не найден");
-            }
+            System.out.println("Пользователь удалён");
         } catch (NumberFormatException exception) {
             System.out.println("Ошибка: ID должен быть целым числом");
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (SQLException exception) {
             if ("23503".equals(exception.getSQLState())) {
                 System.out.println(
@@ -300,10 +484,39 @@ public class Main {
             }
         }
     }
+    private static void exportToExcel(
+        UserService userService,
+        TournamentService tournamentService,
+        RegistrationService registrationService,
+        ExcelExporter excelExporter
+    ) {
+        try {
+            Path outputFile = excelExporter.export(
+                Path.of("exports"),
+                userService.findAll(),
+                tournamentService.findAll()
+                    .stream()
+                    .sorted(
+                        Comparator.comparingLong(Tournament::getId)
+                    )
+                    .toList(),
+                registrationService.findAll()
+            );
+
+            System.out.println("Excel успешно создан: "+outputFile);
+
+        } catch (SQLException exception){
+            System.out.println(
+                "Не удалось получить данные из БД:" +exception.getMessage()
+            );
+        } catch (IOException exception){
+            System.out.println("Не удалос создать excel: "+exception.getMessage());
+        }
+    }
 
     private static void createTournament(
         Scanner scanner,
-        TournamentRepository tournamentRepository
+        TournamentService tournamentService
     ) {
         try {
             System.out.print("Название турнира: ");
@@ -330,7 +543,7 @@ public class Main {
             Integer minRating = readNullableInteger(scanner);
             System.out.print("Максимальный рейтинг (Enter - без ограничений): ");
             Integer maxRating = readNullableInteger(scanner);
-            Tournament tournament = tournamentRepository.create(
+            Tournament tournament = tournamentService.create(
                 title,
                 timeControl,
                 startDate,
@@ -355,6 +568,10 @@ public class Main {
                 "Ошибка: неверный контроль времени "
                 + "или некорректные данные"
             );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (SQLException exception) {
             System.out.println(
                 "Не удалось создать турнир: "
@@ -375,7 +592,7 @@ public class Main {
     }
     private static void updateTournament(
         Scanner scanner,
-        TournamentRepository tournamentRepository
+        TournamentService tournamentService
     ) {
         try {
             System.out.print("ID турнира: ");
@@ -427,7 +644,7 @@ public class Main {
             TournamentStatus status = TournamentStatus.valueOf(
                 scanner.nextLine().trim().toUpperCase()
             );
-            boolean updated = tournamentRepository.update(
+            tournamentService.update(
                 id,
                 title,
                 timeControl,
@@ -438,11 +655,7 @@ public class Main {
                 maxRating,
                 status
             );
-            if (updated) {
-                System.out.println("Турнир изменён");
-            } else {
-                System.out.println("Турнир с ID " + id + " не найден");
-            }
+            System.out.println("Турнир изменён");
         } catch (NumberFormatException exception) {
             System.out.println(
                 "Ошибка: ID, места и рейтинги должны быть числами"
@@ -455,6 +668,10 @@ public class Main {
             System.out.println(
                 "Ошибка: " + exception.getMessage()
             );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (SQLException exception) {
             System.out.println(
                 "Не удалось изменить турнир: "
@@ -464,7 +681,7 @@ public class Main {
     }
     private static void deleteTournament(
         Scanner scanner,
-        TournamentRepository tournamentRepository
+        TournamentService tournamentService
     ) {
         try {
             System.out.print("ID турнира для удаления: ");
@@ -481,18 +698,15 @@ public class Main {
                 System.out.println("Удаление отменено");
                 return;
             }
-            boolean deleted = tournamentRepository.deleteById(id);
-
-            if (deleted) {
-                System.out.println("Турнир удалён");
-            } else {
-                System.out.println(
-                    "Турнир с ID " + id + " не найден"
-                );
-            }
+            tournamentService.delete(id);
+            System.out.println("Турнир удалён");
         } catch (NumberFormatException exception) {
             System.out.println(
                 "Ошибка: ID должен быть целым числом"
+            );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
             );
         } catch (SQLException exception) {
             if ("23503".equals(exception.getSQLState())) {
@@ -510,8 +724,8 @@ public class Main {
     }
     private static void runPlayerMenu(
         Scanner scanner,
-        TournamentRepository tournamentRepository,
-        RegistrationRepository registrationRepository,
+        TournamentService tournamentService,
+        RegistrationService registrationService,
         User currentUser
     ) throws SQLException {
 
@@ -532,7 +746,7 @@ public class Main {
             switch (choice) {
                 case "1" -> {
                     List<Tournament> tournaments =
-                        tournamentRepository.findAll();
+                        tournamentService.findAll();
 
                     System.out.println();
                     System.out.println("=== ТУРНИРЫ ===");
@@ -545,13 +759,12 @@ public class Main {
                 case "2" ->
                     createRegistration(
                         scanner,
-                        tournamentRepository,
-                        registrationRepository,
+                        registrationService,
                         currentUser
                     );
                 case "3" -> {
                     List<Registration> registrations =
-                        registrationRepository.findByUserId(
+                        registrationService.findByUserId(
                             currentUser.getId()
                         );
 
@@ -570,7 +783,7 @@ public class Main {
                 case "4" ->
                     cancelRegistration(
                         scanner,
-                        registrationRepository,
+                        registrationService,
                         currentUser
                     );
                 case "0" -> {
@@ -585,8 +798,7 @@ public class Main {
     }
     private static void createRegistration(
         Scanner scanner,
-        TournamentRepository tournamentRepository,
-        RegistrationRepository registrationRepository,
+        RegistrationService registrationService,
         User currentUser
     ) {
         try {
@@ -596,57 +808,7 @@ public class Main {
                 scanner.nextLine().trim()
             );
 
-            Tournament tournament =
-                tournamentRepository.findById(tournamentId);
-
-            if (tournament == null) {
-                System.out.println(
-                    "Турнир с ID "
-                    + tournamentId
-                    + " не найден"
-                );
-                return;
-            }
-
-            if (tournament.getStatus()
-                != TournamentStatus.REGISTRATION_OPEN) {
-                System.out.println(
-                    "Регистрация на этот турнир закрыта"
-                );
-                return;
-            }
-
-            if (!tournament.getStartDate().isAfter(LocalDate.now())) {
-                System.out.println(
-                    "Нельзя зарегистрироваться "
-                    + "на начавшийся турнир"
-                );
-                return;
-            }
-
-            Integer minRating = tournament.getMinRating();
-
-            if (minRating != null && currentUser.getRating() < minRating) {
-
-                System.out.println(
-                    "Недостаточный рейтинг. Минимум: "
-                    + minRating
-                );
-                return;
-            }
-
-            Integer maxRating = tournament.getMaxRating();
-
-            if (maxRating != null && currentUser.getRating() > maxRating) {
-
-                System.out.println(
-                    "Рейтинг превышает допустимый максимум: "
-                    + maxRating
-                );
-                return;
-            }
-
-            long registrationId = registrationRepository.create(
+            long registrationId = registrationService.create(
                 currentUser.getId(),
                 tournamentId
             );
@@ -660,23 +822,20 @@ public class Main {
             System.out.println(
                 "Ошибка: ID должен быть целым числом"
             );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (SQLException exception) {
-            if ("23505".equals(exception.getSQLState())) {
-                System.out.println(
-                    "У вас уже есть активная заявка "
-                    + "на этот турнир"
-                );
-            } else {
-                System.out.println(
-                    "Не удалось создать заявку: "
+            System.out.println(
+                "Не удалось создать заявку: "
                     + exception.getMessage()
-                );
-            }
+            );
         }
     }
     private static void cancelRegistration(
         Scanner scanner,
-        RegistrationRepository registrationRepository,
+        RegistrationService registrationService,
         User currentUser
     ) {
         try {
@@ -688,23 +847,19 @@ public class Main {
                 scanner.nextLine().trim()
             );
 
-            boolean cancelled = registrationRepository.cancelByUser(
+            registrationService.cancelByUser(
                 registrationId,
                 currentUser.getId()
             );
-
-            if (cancelled) {
-                System.out.println("Заявка отменена");
-            } else {
-                System.out.println(
-                    "Заявка не найдена, принадлежит другому игроку "
-                    + "или уже завершена"
-                );
-            }
+            System.out.println("Заявка отменена");
 
         } catch (NumberFormatException exception) {
             System.out.println(
                 "Ошибка: ID должен быть целым числом"
+            );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
             );
         } catch (SQLException exception) {
             System.out.println(
@@ -715,7 +870,7 @@ public class Main {
     }
     private static void changeRegistrationStatus(
         Scanner scanner,
-        RegistrationRepository registrationRepository
+        RegistrationService registrationService
     ) {
         try {
             System.out.print("Введите ID заявки: ");
@@ -723,18 +878,6 @@ public class Main {
             long registrationId = Long.parseLong(
                scanner.nextLine().trim()
             );
-
-            Registration registration =
-                registrationRepository.findById(registrationId);
-
-            if (registration == null) {
-                System.out.println(
-                    "Заявка с ID "
-                    + registrationId
-                    + " не найдена"
-                );
-                return;
-            }
 
             System.out.print(
                 "Новый статус "
@@ -745,21 +888,13 @@ public class Main {
                 scanner.nextLine().trim().toUpperCase()
             );
 
-            registration.changeStatus(newStatus);
-
-            boolean updated = registrationRepository.updateStatus(
+            registrationService.changeStatus(
                 registrationId,
                 newStatus
             );
-
-            if (updated) {
-                System.out.println(
-                    "Статус заявки изменён на "
-                    + newStatus
-                );
-            } else {
-                System.out.println("Заявка не найдена");
-            }
+            System.out.println(
+                "Статус заявки изменён на " + newStatus
+            );
 
         } catch (NumberFormatException exception) {
             System.out.println(
@@ -773,11 +908,257 @@ public class Main {
             System.out.println(
                 "Ошибка: " + exception.getMessage()
             );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
         } catch (SQLException exception) {
             System.out.println(
                 "Не удалось изменить заявку: "
                 + exception.getMessage()
             );
         }
+    }
+    private static void findRegistrationById(
+        Scanner scanner,
+        RegistrationService registrationService
+    ) {
+        try {
+            System.out.print("Введите ID заявки: ");
+            long id = Long.parseLong(
+                scanner.nextLine().trim()
+            );
+
+            Registration registration =
+                registrationService.findById(id);
+
+            System.out.println();
+            System.out.println("=== ЗАЯВКА ===");
+            System.out.println(registration);
+        } catch (NumberFormatException exception) {
+            System.out.println(
+                "Ошибка: ID должен быть целым числом"
+            );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
+        } catch (SQLException exception) {
+            System.out.println(
+                "Не удалось получить заявку: "
+                    + exception.getMessage()
+            );
+        }
+    }
+    public static void searchRegistrationsByPlayer(
+        Scanner scanner,
+        RegistrationService registrationService
+    ) {
+        try{
+            System.out.print("Введите часть ФИО игрока: ");
+            String playerName = scanner.nextLine().trim();
+
+            if(playerName.isEmpty()){
+                System.out.println(
+                    "Ошибка: строка поиска не может быть пустой"
+                );
+                return;
+            }
+            List<Registration> registrations =
+                registrationService.searchByPlayerName(playerName);
+            System.out.println();
+            System.out.println(
+                "===РЕЗУЛЬТАТ ПОИСКА ПО ФИО==="
+            );
+
+            if (registrations.isEmpty()){
+                System.out.println("Заявки не найдены");
+                return;
+            }
+
+            for (Registration registration : registrations ){
+                System.out.println(registration);
+            }
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
+        } catch (SQLException exception){
+            System.out.println(
+                "Не удалось выполнить поиск: " + exception.getMessage()
+            );
+        }
+    }
+    private static void searchRegistrationsByTournament(
+        Scanner scanner,
+        RegistrationService registrationService
+    ) {
+        try{
+            System.out.print(
+                "Введите часть названия турнира:"
+            );
+            String tournamentTitle = scanner.nextLine().trim();
+
+            if(tournamentTitle.isEmpty()){
+                System.out.println("Ошибка: строка поиска не может быть пустой");
+                return;
+            }
+            List<Registration> registrations = registrationService.searchByTournamentTitle(
+                tournamentTitle
+            );
+            System.out.println();
+            System.out.println(
+                "===РЕЗУЛЬТАТ ПОИСКА ПО ТУРНИРАМ==="
+            );
+            if (registrations.isEmpty()){
+                System.out.println("Заявки не найдены");
+                return;
+            }
+            for (Registration registration : registrations){
+                System.out.println(registration);
+            }
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
+        } catch (SQLException exception){
+            System.out.println(
+                "Не удалось выполнить поиск: "+exception.getMessage()
+            );
+        }
+    }
+    private static void filterRegistrationsByStatus(
+        Scanner scanner,
+        RegistrationService registrationService
+    ) {
+        try {
+            System.out.print(
+                "Статус (PENDING, CONFIRMED, REJECTED, CANCELLED): "
+            );
+            RegistrationStatus status = RegistrationStatus.valueOf(
+                scanner.nextLine().trim().toUpperCase()
+            );
+
+            List<Registration> registrations =
+                registrationService.filterByStatus(status);
+
+            printRegistrations(
+                "ФИЛЬТР ПО СТАТУСУ",
+                registrations
+            );
+        } catch (IllegalArgumentException exception){
+            System.out.println("Ошибка: неизвестный статус");
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
+        } catch (SQLException exception){
+            System.out.println(
+                "Не удалось выполнить фильтрацию: " + exception.getMessage()
+            );
+        }
+    }
+    private static void filterRegistrationsByDate(
+        Scanner scanner,
+        RegistrationService registrationService
+    ) {
+        try {
+            System.out.print("ДАТА от (ГГГГ-ММ-ДД): ");
+            LocalDate from = LocalDate.parse(
+                scanner.nextLine().trim()
+            );
+            System.out.print("ДАТА до (ГГГГ-ММ-ДД): ");
+            LocalDate to = LocalDate.parse(
+                scanner.nextLine().trim()
+            );
+            List<Registration> registrations =
+                registrationService.filterByDateRange(from, to);
+
+            printRegistrations(
+                "ФИЛЬТР ПО ДИАПОЗОНУ ДАТ",
+                registrations
+            );
+
+        } catch (DateTimeParseException exception) {
+            System.out.println(
+                "Ошибка: дата должна быть в формате ГГГГ-ММ-ДД"
+            );
+        } catch (IllegalArgumentException exception){
+            System.out.println(
+                "Не удалось выполнить фильтрацию: " + exception.getMessage()
+            );
+        } catch (BusinessException exception) {
+            System.out.println(
+                "Ошибка: " + exception.getMessage()
+            );
+        }
+        catch (SQLException exception) {
+            System.out.println(
+                "Не удалось выполнить фильтрацию: "
+                    + exception.getMessage()
+            );
+        }
+
+    }
+
+    private static void printRegistrations(
+        String title,
+        List<Registration> registrations
+    ) {
+        System.out.println();
+        System.out.println("=== "+title+" ===");
+
+        if (registrations.isEmpty()){
+            System.out.println("Заявки не найдены");
+            return;
+        }
+        for ( Registration registration : registrations){
+            System.out.println(registration);
+        }
+    }
+    private static void showStatistics(
+        StatisticsService statisticsService
+
+    ) {
+        try {
+            RegistrationStatistics statistics =
+                statisticsService.calculate();
+
+            printStatistics(statistics);
+        } catch (SQLException exception) {
+            System.out.println(
+                "Не удалось получить статистику: "
+                    + exception.getMessage()
+            );
+        }
+    }
+    private static void printStatistics (
+        RegistrationStatistics statistics
+    ) {
+        System.out.println();
+        System.out.println("=== СТАТИСТИКА ===");
+
+        System.out.println(
+            "Всего пользователей: "+statistics.getTotalUsers()
+        );
+        System.out.println(
+            "Всего заявок: "+statistics.getTotalRegistrations()
+        );
+        System.out.println(
+            "Всего турниров: "+statistics.getTotalTournaments()
+        );
+        System.out.println(
+            "Заявки, ожидающие решения: "+statistics.getPending()
+        );
+        System.out.println(
+            "Заявки подтверждённые: "+statistics.getConfirmed()
+        );
+        System.out.println(
+            "Заявки отклонённые: "+statistics.getRejected()
+        );
+        System.out.println(
+            "Заявки отменённые: "+statistics.getCancelled()
+        );
+
     }
 }
