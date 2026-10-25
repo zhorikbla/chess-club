@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.FlowPane?>
+
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="ru.mirea.project.controller.MainController"
+            styleClass="app-root">
+
+    <top>
+        <VBox spacing="5"
+              styleClass="app-header">
+            <padding>
+                <Insets top="20"
+                        right="20"
+                        bottom="10"
+                        left="20" />
+            </padding>
+
+            <Label text="Шахматный клуб"
+                   styleClass="title-label" />
+            <Label fx:id="userLabel"
+                   text="Пользователь"
+                   styleClass="secondary-label" />
+        </VBox>
+    </top>
+    <center>
+        <TabPane tabClosingPolicy="UNAVAILABLE"
+                 styleClass="content-tabs">
+            <BorderPane.margin>
+                <Insets right="20"
+                        bottom="20"
+                        left="20"
+                        />
+            </BorderPane.margin>
+
+            <tabs>
+                <Tab text="Заявки">
+                    <BorderPane>
+                        <top>
+                            <VBox spacing="8"
+                                  styleClass="filter-panel">
+                                <Label fx:id="statusLabel"
+                                       text="Заявки пока не загружены" />
+
+                                <HBox spacing="10">
+                                    <TextField fx:id="searchField"
+                                               promptText="Поиск по игроку или турниру"
+                                               HBox.hgrow="ALWAYS" />
+                                    <ComboBox fx:id="statusFilter"
+                                              promptText="Все статусы"
+                                              prefWidth="170" />
+                                    <ComboBox fx:id="tournamentFilter"
+                                              promptText="Все турниры"
+                                              prefWidth="220" />
+                                    <Button text="Сбросить"
+                                            onAction="#handleResetFilters" />
+                                </HBox>
+
+                                <padding>
+                                    <Insets top="12"
+                                            right="12"
+                                            bottom="10"
+                                            left="12" />
+                                </padding>
+                            </VBox>
+                        </top>
+
+                        <center>
+                            <TableView fx:id="registrationTable">
+                                <columns>
+                                    <TableColumn fx:id="idColumn"
+                                                 text="ID"
+                                                 prefWidth="60" />
+                                    <TableColumn fx:id="playerColumn"
+                                                 text="Игрок"
+                                                 prefWidth="180" />
+                                    <TableColumn fx:id="ratingColumn"
+                                                 text="Рейтинг"
+                                                 prefWidth="100" />
+                                    <TableColumn fx:id="tournamentColumn"
+                                                 text="Турнир"
+                                                 prefWidth="210" />
+                                    <TableColumn fx:id="statusColumn"
+                                                 text="Статус"
+                                                 prefWidth="130" />
+                                    <TableColumn fx:id="dateColumn"
+                                                 text="Дата подачи"
+                                                 prefWidth="170" />
+                                </columns>
+                            </TableView>
+                        </center>
+
+                        <bottom>
+                            <FlowPane hgap="10"
+                                      vgap="8">
+                                <padding>
+                                    <Insets top="10"
+                                            right="12"
+                                            bottom="12"
+                                            left="12" />
+                                </padding>
+
+                                <Button fx:id="addButton"
+                                        text="Добавить"
+                                        styleClass="primary-button"
+                                        onAction="#handleAdd" />
+                                <Button fx:id="editButton"
+                                        text="Изменить"
+                                        onAction="#handleEdit" />
+                                <Button fx:id="deleteButton"
+                                        text="Удалить"
+                                        styleClass="danger-button"
+                                        onAction="#handleDelete" />
+                                <Button text="Обновить"
+                                        onAction="#handleRefresh" />
+                                <Button fx:id="statisticsButton"
+                                        text="Статистика"
+                                        onAction="#handleStatistics" />
+                                <Button fx:id="exportButton"
+                                        text="Экспорт в Excel"
+                                        onAction="#handleExport" />
+                            </FlowPane>
+                        </bottom>
+                    </BorderPane>
+                </Tab>
+
+                <Tab text="Турниры">
+                    <BorderPane>
+                        <center>
+                            <TableView fx:id="tournamentsTable">
+                                <columns>
+                                    <TableColumn fx:id="tournamentIdColumn"
+                                                 text="ID"
+                                                 prefWidth="55" />
+                                    <TableColumn fx:id="tournamentTitleColumn"
+                                                 text="Название"
+                                                 prefWidth="180" />
+                                    <TableColumn fx:id="timeControlColumn"
+                                                 text="Контроль"
+                                                 prefWidth="100" />
+                                    <TableColumn fx:id="startDateColumn"
+                                                 text="Начало"
+                                                 prefWidth="105" />
+                                    <TableColumn fx:id="endDateColumn"
+                                                 text="Окончание"
+                                                 prefWidth="105" />
+                                    <TableColumn fx:id="capacityColumn"
+                                                 text="Мест"
+                                                 prefWidth="70" />
+                                    <TableColumn fx:id="occupiedColumn"
+                                                 text="Занято"
+                                                 prefWidth="75" />
+                                    <TableColumn fx:id="availableColumn"
+                                                 text="Свободно"
+                                                 prefWidth="85" />
+                                    <TableColumn fx:id="ratingRangeColumn"
+                                                 text="Рейтинг"
+                                                 prefWidth="150" />
+                                    <TableColumn fx:id="tournamentStatusColumn"
+                                                 text="Статус"
+                                                 prefWidth="170" />
+                                </columns>
+                            </TableView>
+                        </center>
+
+                        <bottom>
+                            <FlowPane hgap="10"
+                                      vgap="8">
+                                <padding>
+                                    <Insets top="10"
+                                            right="12"
+                                            bottom="12"
+                                            left="12" />
+                                </padding>
+
+                                <Button fx:id="registerForTournamentButton"
+                                        text="Подать заявку"
+                                        styleClass="primary-button"
+                                        onAction="#handleRegisterForTournament" />
+                                <Button text="Обновить турниры"
+                                        onAction="#handleRefreshTournaments" />
+                            </FlowPane>
+                        </bottom>
+                    </BorderPane>
+                </Tab>
+
+                <Tab text="Профиль">
+                    <VBox alignment="TOP_CENTER"
+                          spacing="18"
+                          styleClass="profile-view">
+                        <padding>
+                            <Insets top="45"
+                                    right="40"
+                                    bottom="40"
+                                    left="40" />
+                        </padding>
+
+                        <Label text="Личный профиль"
+                               styleClass="section-title" />
+
+                        <GridPane hgap="30"
+                                  vgap="18"
+                                  maxWidth="560"
+                                  styleClass="profile-card">
+                            <Label text="ФИО:"
+                                   GridPane.columnIndex="0"
+                                   GridPane.rowIndex="0" />
+                            <Label fx:id="profileFullNameLabel"
+                                   GridPane.columnIndex="1"
+                                   GridPane.rowIndex="0" />
+
+                            <Label text="Email:"
+                                   GridPane.columnIndex="0"
+                                   GridPane.rowIndex="1" />
+                            <Label fx:id="profileEmailLabel"
+                                   GridPane.columnIndex="1"
+                                   GridPane.rowIndex="1" />
+
+                            <Label text="Роль:"
+                                   GridPane.columnIndex="0"
+                                   GridPane.rowIndex="2" />
+                            <Label fx:id="profileRoleLabel"
+                                   GridPane.columnIndex="1"
+                                   GridPane.rowIndex="2" />
+
+                            <Label text="Рейтинг:"
+                                   GridPane.columnIndex="0"
+                                   GridPane.rowIndex="3" />
+                            <Label fx:id="profileRatingLabel"
+                                   GridPane.columnIndex="1"
+                                   GridPane.rowIndex="3" />
+                        </GridPane>
+                    </VBox>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+</BorderPane>

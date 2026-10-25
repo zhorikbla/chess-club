@@ -8,3 +8,4 @@ exports/
 .env
 .reference/
 full-tz/
+src/main/resources/database.properties
