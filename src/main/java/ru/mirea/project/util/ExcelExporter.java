@@ -42,6 +42,24 @@ public class ExcelExporter{
         }
         return outputFile.toAbsolutePath();
     }
+    public Path exportRegistrations(
+        Path outputFile,
+        List<Registration> registrations
+    ) throws IOException {
+        try(Workbook workbook = new XSSFWorkbook()){
+            createRegistrationsSheet(
+                workbook,
+                registrations
+            );
+            try(
+                OutputStream outputStream = Files.newOutputStream(outputFile);
+            ) {
+                workbook.write(outputStream);
+            }
+        }
+        return outputFile.toAbsolutePath();
+    }
+
     private void createUsersSheet(
         Workbook workbook,
         List<User> users

@@ -1,0 +1,3 @@
+db.url=jdbc:postgresql://localhost:55432/chess_tournament
+db.user=chess_app
+db.password=chess_app

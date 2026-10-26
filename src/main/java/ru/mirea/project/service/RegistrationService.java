@@ -52,6 +52,13 @@ public class RegistrationService {
         return registrationRepository.findByUserId(userId);
     }
 
+    public long countActiveByTournamentId(long tournamentId)
+        throws SQLException {
+        return registrationRepository.countActiveByTournamentId(
+            tournamentId
+        );
+    }
+
     public long create(long userId, long tournamentId)
         throws SQLException {
         User user = userRepository.findById(userId);
@@ -114,14 +121,45 @@ public class RegistrationService {
         }
     }
 
-    public void delete(long id) throws SQLException {
-        findById(id);
+    public List<RegistrationStatus> allowedStatusesFor(
+        RegistrationStatus currentStatus
+    ) {
+        if (currentStatus == null) {
+            throw new BusinessException("Текущий статус обязателен");
+        }
 
-        if (!registrationRepository.deleteById(id)) {
+        return switch (currentStatus) {
+            case PENDING -> List.of(
+                RegistrationStatus.CONFIRMED,
+                RegistrationStatus.REJECTED,
+                RegistrationStatus.CANCELLED
+            );
+            case CONFIRMED -> List.of(
+                RegistrationStatus.CANCELLED
+            );
+            case REJECTED, CANCELLED -> List.of();
+        };
+    }
+
+    public void delete(long id) throws SQLException {
+        Registration registration = findById(id);
+
+        if (!canDelete(registration.getStatus())) {
             throw new BusinessException(
                 "Удалить можно только активную заявку"
             );
         }
+
+        if (!registrationRepository.deleteById(id)) {
+            throw new BusinessException(
+                "Не удалось удалить заявку"
+            );
+        }
+    }
+
+    public boolean canDelete(RegistrationStatus status) {
+        return status == RegistrationStatus.PENDING
+            || status == RegistrationStatus.CONFIRMED;
     }
 
     public void cancelByUser(long id, long userId)
@@ -226,16 +264,7 @@ public class RegistrationService {
         RegistrationStatus current,
         RegistrationStatus target
     ) {
-        if (target == null || current == target) {
-            return false;
-        }
-
-        return switch (current) {
-            case PENDING -> target == RegistrationStatus.CONFIRMED
-                || target == RegistrationStatus.REJECTED
-                || target == RegistrationStatus.CANCELLED;
-            case CONFIRMED -> target == RegistrationStatus.CANCELLED;
-            case REJECTED, CANCELLED -> false;
-        };
+        return target != null
+            && allowedStatusesFor(current).contains(target);
     }
 }

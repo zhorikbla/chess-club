@@ -1,42 +1,44 @@
-# Шахматный клуб
+# Шахматный клуб — КР №2
 
-Консольная информационная система на Java для управления пользователями,
-турнирами и заявками игроков. Основная сущность проекта — регистрация игрока
-на турнир. Данные хранятся в PostgreSQL, доступ выполняется через JDBC.
+Настольное JavaFX-приложение для управления регистрациями игроков на
+шахматные турниры. Интерфейс построен на JavaFX и FXML, данные хранятся в
+PostgreSQL, доступ к базе выполняется напрямую через JDBC.
 
-## Возможности MVP
+## Возможности
 
-- вход по email и разделение меню по ролям `ADMIN` и `PLAYER`;
-- просмотр, создание, изменение и удаление пользователей;
-- просмотр, создание, изменение и удаление турниров;
-- просмотр всех заявок и изменение их статуса администратором;
-- просмотр турниров, подача заявки, просмотр и отмена своих заявок игроком;
-- проверки статуса турнира, даты начала и рейтинговых ограничений;
-- защита от повторной активной заявки и удаления связанных данных.
+- вход по email и интерфейс с учётом ролей `ADMIN` и `PLAYER`;
+- просмотр, поиск, фильтрация и сортировка заявок;
+- создание заявки и изменение её статуса;
+- сохранение истории через перевод заявки в `CANCELLED` вместо физического
+  удаления;
+- просмотр турниров, рейтинговых ограничений и свободных мест;
+- проверка роли, статуса турнира, даты начала, рейтинга, свободных мест и
+  повторной регистрации;
+- статистика по пользователям, турнирам и статусам заявок;
+- экспорт текущего отфильтрованного и отсортированного набора в `.xlsx`;
+- PostgreSQL 17 в Docker Compose.
 
 ## Требования
 
-- JDK 17;
+- JDK 21;
 - Maven 3.9 или новее;
-- PostgreSQL 16 или совместимая версия.
+- Docker Desktop либо Docker Engine с Docker Compose.
 
-## Подготовка базы данных
-
-Скрипт схемы удаляет существующие таблицы и данные. Для чистой установки:
+## Первый запуск после клонирования
 
 ```bash
-psql -h localhost -U postgres -f sql/00_create_db.sql
-psql -h localhost -U chess_app -d chess_tournament -f sql/01_schema.sql
-psql -h localhost -U chess_app -d chess_tournament -f sql/02_data.sql
+git clone https://github.com/zhorikbla/chess-club.git
+cd chess-club
+git switch kr2-javafx
+cp .env.example .env
+cp src/main/resources/database.properties.example \
+   src/main/resources/database.properties
+docker compose --env-file .env up -d --wait
+mvn clean javafx:run
 ```
 
-Пароль учебной роли PostgreSQL: `chess_app`.
-
-## Запуск
-
-```bash
-mvn clean compile exec:java
-```
+Файлы `.env` и `database.properties` намеренно не отправляются в Git. Для
+локального запуска они создаются копированием безопасных шаблонов.
 
 Тестовый администратор:
 
@@ -47,18 +49,49 @@ olga.smirnova@example.com
 Тестовый игрок:
 
 ```text
-alexey.morozov@example.com
+ivan.petrov@example.com
 ```
+
+## Обычный запуск
+
+```bash
+docker compose --env-file .env up -d --wait
+mvn javafx:run
+```
+
+Проверка контейнера:
+
+```bash
+docker compose ps
+```
+
+Остановка без удаления данных:
+
+```bash
+docker compose down
+```
+
+Не используйте `docker compose down -v`, если данные требуется сохранить:
+ключ `-v` удаляет именованный Docker volume.
 
 ## Структура
 
 ```text
-sql/                                      создание БД, схема и тестовые данные
-src/main/java/ru/mirea/project/Main.java  консольный интерфейс
-src/main/java/ru/mirea/project/model/     предметные классы и enum
-src/main/java/ru/mirea/project/repository JDBC и SQL запросы
-src/main/java/ru/mirea/project/database/  создание соединений PostgreSQL
-docs/                                     материалы по ТЗ и защите
+docker-compose.yml                         PostgreSQL 17 в Docker
+sql/                                       схема и тестовые данные
+src/main/java/ru/mirea/project/fx/         запуск JavaFX и смена сцен
+src/main/java/ru/mirea/project/controller/ обработчики FXML и интерфейса
+src/main/java/ru/mirea/project/model/      сущности и enum
+src/main/java/ru/mirea/project/service/    бизнес-правила
+src/main/java/ru/mirea/project/repository/ JDBC и SQL
+src/main/java/ru/mirea/project/database/   создание JDBC-соединений
+src/main/java/ru/mirea/project/util/       экспорт Excel
+src/main/resources/fxml/                   описание окон
+src/main/resources/css/                    стили JavaFX
 ```
 
-Расширенный черновик хранится локально в `.reference/` и не попадает в Git.
+Консольная версия КР №1 сохранена в `Main.java` и запускается отдельно:
+
+```bash
+mvn compile exec:java
+```
